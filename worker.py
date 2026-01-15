@@ -1,14 +1,14 @@
 """
-CosyVoice2 PyWorker Configuration for Vast.ai Serverless
+CosyVoice PyWorker Configuration for Vast.ai Serverless
 
-This file configures the Vast.ai PyWorker to proxy requests to the CosyVoice2
+This file configures the Vast.ai PyWorker to proxy requests to the CosyVoice
 model server running on port 18000.
 
 CRITICAL: This file lives in a PUBLIC GitHub repo and is cloned by the
 Vast.ai bootstrap script when PYWORKER_REPO is set.
 """
 import os
-from vastai import Worker, WorkerConfig, HandlerConfig, LogActionConfig
+from vastai import Worker, WorkerConfig, HandlerConfig, LogActionConfig, BenchmarkConfig
 
 # Model server configuration
 MODEL_SERVER_URL = "http://127.0.0.1"
@@ -18,7 +18,7 @@ MODEL_HEALTHCHECK_ENDPOINT = "/health"
 
 # Log patterns for PyWorker detection
 # CRITICAL: These must match EXACTLY what the model server prints (PREFIX match at start of line)
-MODEL_LOAD_LOG_MSG = ["COSYVOICE2_READY"]
+MODEL_LOAD_LOG_MSG = ["COSYVOICE_READY"]
 MODEL_ERROR_LOG_MSGS = [
     "Traceback",
     "Error:",
@@ -28,16 +28,31 @@ MODEL_ERROR_LOG_MSGS = [
     "ModuleNotFoundError",
 ]
 MODEL_INFO_LOG_MSGS = [
-    "Starting CosyVoice2",
-    "Loading CosyVoice2",
+    "Starting CosyVoice",
+    "Loading CosyVoice",
     "Model loaded",
     "Warmup",
+    "Available speakers",
 ]
 
 
+def benchmark_generator():
+    """
+    Generate benchmark payload for Vast.ai worker validation.
+
+    The benchmark runs after on_load is detected to validate the worker
+    is functioning correctly before joining the standby pool.
+
+    Uses SFT mode with English Female preset speaker.
+    """
+    return {
+        "text": "Hello, this is a benchmark test.",
+        "mode": "sft",
+        "speaker": "english_female",
+    }
+
+
 # PyWorker configuration
-# NOTE: No benchmark configured because CosyVoice2-0.5B only supports zero-shot mode
-# which requires reference audio. Worker will join standby after on_load is detected.
 worker_config = WorkerConfig(
     model_server_url=MODEL_SERVER_URL,
     model_server_port=MODEL_SERVER_PORT,
@@ -48,6 +63,11 @@ worker_config = WorkerConfig(
             route="/generate",
             allow_parallel_requests=False,  # TTS generation uses GPU, no parallelism
             max_queue_time=600.0,  # Long queue time for voice cloning
+            benchmark_config=BenchmarkConfig(
+                generator=benchmark_generator,
+                concurrency=1,
+                runs=1,  # Single run for GPU model
+            ),
         ),
     ],
     log_action_config=LogActionConfig(
