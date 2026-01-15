@@ -8,7 +8,7 @@ CRITICAL: This file lives in a PUBLIC GitHub repo and is cloned by the
 Vast.ai bootstrap script when PYWORKER_REPO is set.
 """
 import os
-from vastai import Worker, WorkerConfig, HandlerConfig, LogActionConfig, BenchmarkConfig
+from vastai import Worker, WorkerConfig, HandlerConfig, LogActionConfig
 
 # Model server configuration
 MODEL_SERVER_URL = "http://127.0.0.1"
@@ -35,21 +35,9 @@ MODEL_INFO_LOG_MSGS = [
 ]
 
 
-def benchmark_generator():
-    """
-    Generate benchmark payload for Vast.ai worker validation.
-
-    The benchmark runs after on_load is detected to validate the worker
-    is functioning correctly before joining the standby pool.
-    """
-    return {
-        "text": "Hello, this is a benchmark test.",
-        "mode": "sft",
-        "speaker": "english_female",
-    }
-
-
 # PyWorker configuration
+# NOTE: No benchmark configured because CosyVoice2-0.5B only supports zero-shot mode
+# which requires reference audio. Worker will join standby after on_load is detected.
 worker_config = WorkerConfig(
     model_server_url=MODEL_SERVER_URL,
     model_server_port=MODEL_SERVER_PORT,
@@ -60,11 +48,6 @@ worker_config = WorkerConfig(
             route="/generate",
             allow_parallel_requests=False,  # TTS generation uses GPU, no parallelism
             max_queue_time=600.0,  # Long queue time for voice cloning
-            benchmark_config=BenchmarkConfig(
-                generator=benchmark_generator,
-                concurrency=1,
-                runs=1,  # Single run for GPU model
-            ),
         ),
     ],
     log_action_config=LogActionConfig(
